@@ -49,6 +49,18 @@ fn makeToken(self: *Scanner, ttype: TokenType) Token {
     };
 }
 
+fn match(self: *Scanner, expected: u8) bool {
+    if (self.isAtEnd()) {
+        return false;
+    }
+    if (self.source[self.current] != expected) {
+        return false;
+    }
+
+    self.current += 1;
+    return true;
+}
+
 fn scanToken(self: *Scanner) Token {
     self.start = self.current;
     if (self.isAtEnd()) {
@@ -69,6 +81,10 @@ fn scanToken(self: *Scanner) Token {
         '+' => self.makeToken(.PLUS),
         ';' => self.makeToken(.SEMICOLON),
         '*' => self.makeToken(.STAR),
+        '!' => self.makeToken(if (match('=')) .BANG_EQUAL else .BANG),
+        '=' => self.makeToken(if (match('=')) .EQUAL_EQUAL else .EQUAL),
+        '<' => self.makeToken(if (match('=')) .LESS_EQUAL else .LESS),
+        '>' => self.makeToken(if (match('=')) .GREATER_EQUAL else .GREATER),
         else => {
             return self.makeError("Unexpected character");
         },
