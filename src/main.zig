@@ -27,6 +27,6 @@ fn run(allocator: std.mem.Allocator, source: []const u8) !void {
     var scanner = Scanner.init(allocator, source);
     const tokens = try scanner.scanTokens();
     for (tokens.items) |token| {
-        std.debug.print("{}: {} ({s})\n", .{ token.line, token.ttype, token.lexeme });
+        std.debug.print("{}: {} [{s}]\n", .{ token.line, token.ttype, token.lexeme });
     }
 }

@@ -83,6 +83,23 @@ fn skipWhitespace(self: *Scanner) void {
     }
 }
 
+fn string(self: *Scanner) Token {
+    while (self.peek() != '"' and !self.isAtEnd()) {
+        if (self.peek() == '\n') {
+            self.line += 1;
+        }
+        self.advance();
+    }
+
+    if (self.isAtEnd()) {
+        return self.makeError("Unterminated string.");
+    }
+
+    self.advance();
+
+    return self.makeToken(.STRING);
+}
+
 fn scanToken(self: *Scanner) Token {
     self.skipWhitespace();
 
@@ -105,11 +122,12 @@ fn scanToken(self: *Scanner) Token {
         '+' => self.makeToken(.PLUS),
         ';' => self.makeToken(.SEMICOLON),
         '*' => self.makeToken(.STAR),
-        '/' => self.makeToken(.SLASH), // TODO: Add comment case
+        '/' => self.makeToken(.SLASH),
         '!' => self.makeToken(if (self.match('=')) .BANG_EQUAL else .BANG),
         '=' => self.makeToken(if (self.match('=')) .EQUAL_EQUAL else .EQUAL),
         '<' => self.makeToken(if (self.match('=')) .LESS_EQUAL else .LESS),
         '>' => self.makeToken(if (self.match('=')) .GREATER_EQUAL else .GREATER),
+        '"' => self.string(),
         else => {
             return self.makeError("Unexpected character");
         },
