@@ -61,7 +61,31 @@ fn match(self: *Scanner, expected: u8) bool {
     return true;
 }
 
+fn skipWhitespace(self: *Scanner) void {
+    while (true) {
+        switch (self.peek()) {
+            ' ', '\r', '\t' => self.advance(),
+            '\n' => {
+                self.line += 1;
+                self.advance();
+            },
+            '/' => {
+                if (self.match('/')) {
+                    while (self.peek() != '\n' and !self.isAtEnd()) {
+                        self.advance();
+                    }
+                } else {
+                    return;
+                }
+            },
+            else => return,
+        }
+    }
+}
+
 fn scanToken(self: *Scanner) Token {
+    self.skipWhitespace();
+
     self.start = self.current;
     if (self.isAtEnd()) {
         return self.makeToken(.EOF);
@@ -81,10 +105,11 @@ fn scanToken(self: *Scanner) Token {
         '+' => self.makeToken(.PLUS),
         ';' => self.makeToken(.SEMICOLON),
         '*' => self.makeToken(.STAR),
-        '!' => self.makeToken(if (match('=')) .BANG_EQUAL else .BANG),
-        '=' => self.makeToken(if (match('=')) .EQUAL_EQUAL else .EQUAL),
-        '<' => self.makeToken(if (match('=')) .LESS_EQUAL else .LESS),
-        '>' => self.makeToken(if (match('=')) .GREATER_EQUAL else .GREATER),
+        '/' => self.makeToken(.SLASH), // TODO: Add comment case
+        '!' => self.makeToken(if (self.match('=')) .BANG_EQUAL else .BANG),
+        '=' => self.makeToken(if (self.match('=')) .EQUAL_EQUAL else .EQUAL),
+        '<' => self.makeToken(if (self.match('=')) .LESS_EQUAL else .LESS),
+        '>' => self.makeToken(if (self.match('=')) .GREATER_EQUAL else .GREATER),
         else => {
             return self.makeError("Unexpected character");
         },
