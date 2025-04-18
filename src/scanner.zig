@@ -7,6 +7,24 @@ tokens: std.ArrayList(Token),
 start: usize,
 current: usize,
 line: usize,
+keywords: std.StaticStringMap(TokenType) = std.StaticStringMap(TokenType).initComptime(.{
+    .{ "and", .AND },
+    .{ "class", .CLASS },
+    .{ "else", .ELSE },
+    .{ "false", .FALSE },
+    .{ "for", .FOR },
+    .{ "fun", .FUN },
+    .{ "if", .IF },
+    .{ "nil", .NIL },
+    .{ "or", .OR },
+    .{ "print", .PRINT },
+    .{ "return", .RETURN },
+    .{ "super", .SUPER },
+    .{ "this", .THIS },
+    .{ "true", .TRUE },
+    .{ "var", .VAR },
+    .{ "while", .WHILE },
+}),
 
 pub fn init(allocator: std.mem.Allocator, source: []const u8) Scanner {
     return Scanner{
@@ -122,8 +140,27 @@ fn scanNumber(self: *Scanner) Token {
     return self.makeToken(.NUMBER);
 }
 
+fn scanIdentifier(self: *Scanner) Token {
+    while (isAlphaNumeric(self.peek())) {
+        self.advance();
+    }
+
+    const text = self.source[self.start..self.current];
+    const ttype = self.keywords.get(text);
+
+    return self.makeToken(ttype orelse .IDENTIFIER);
+}
+
 fn isDigit(c: u8) bool {
     return c >= '0' and c <= '9';
+}
+
+fn isAlpha(c: u8) bool {
+    return (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or c == '_';
+}
+
+fn isAlphaNumeric(c: u8) bool {
+    return isAlpha(c) or isDigit(c);
 }
 
 fn scanToken(self: *Scanner) Token {
@@ -156,6 +193,7 @@ fn scanToken(self: *Scanner) Token {
         '"' => self.scanString(),
         else => {
             if (isDigit(self.peek())) return self.scanNumber();
+            if (isAlpha(self.peek())) return self.scanIdentifier();
             return self.makeError("Unexpected character");
         },
     };
