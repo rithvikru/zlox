@@ -29,6 +29,13 @@ fn peek(self: *Scanner) u8 {
     return self.source[self.current];
 }
 
+fn peekNext(self: *Scanner) u8 {
+    if (self.current + 1 >= self.source.len) {
+        return 0;
+    }
+    return self.source[self.current + 1];
+}
+
 fn advance(self: *Scanner) void {
     self.current += 1;
 }
@@ -83,7 +90,7 @@ fn skipWhitespace(self: *Scanner) void {
     }
 }
 
-fn string(self: *Scanner) Token {
+fn scanString(self: *Scanner) Token {
     while (self.peek() != '"' and !self.isAtEnd()) {
         if (self.peek() == '\n') {
             self.line += 1;
@@ -98,6 +105,25 @@ fn string(self: *Scanner) Token {
     self.advance();
 
     return self.makeToken(.STRING);
+}
+
+fn scanNumber(self: *Scanner) Token {
+    while (isDigit(self.peek())) {
+        self.advance();
+    }
+
+    if (self.peek() == '.' and isDigit(self.peekNext())) {
+        self.advance();
+        while (isDigit(self.peek())) {
+            self.advance();
+        }
+    }
+
+    return self.makeToken(.NUMBER);
+}
+
+fn isDigit(c: u8) bool {
+    return c >= '0' and c <= '9';
 }
 
 fn scanToken(self: *Scanner) Token {
@@ -127,8 +153,9 @@ fn scanToken(self: *Scanner) Token {
         '=' => self.makeToken(if (self.match('=')) .EQUAL_EQUAL else .EQUAL),
         '<' => self.makeToken(if (self.match('=')) .LESS_EQUAL else .LESS),
         '>' => self.makeToken(if (self.match('=')) .GREATER_EQUAL else .GREATER),
-        '"' => self.string(),
+        '"' => self.scanString(),
         else => {
+            if (isDigit(self.peek())) return self.scanNumber();
             return self.makeError("Unexpected character");
         },
     };
