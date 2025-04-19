@@ -1,7 +1,7 @@
 const std = @import("std");
 const Scanner = @import("scanner.zig");
-const Ast = @import("ast.zig");
 const Token = @import("scanner.zig").Token;
+const Parser = @import("parser.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -28,7 +28,14 @@ fn runFile(allocator: std.mem.Allocator, path: []const u8) !void {
 fn run(allocator: std.mem.Allocator, source: []const u8) !void {
     var scanner = Scanner.init(allocator, source);
     const tokens = try scanner.scanTokens();
-    for (tokens.items) |token| {
-        std.debug.print("[{}] {} [{s}]\n", .{ token.line, token.ttype, token.lexeme });
-    }
+    // for (tokens.items) |token| {
+    //     std.debug.print("[{}] {} [{s}]\n", .{ token.line, token.ttype, token.lexeme });
+    // }
+    var parser = Parser.init(allocator, tokens);
+    const expression = parser.parse() catch |err| {
+        std.debug.print("Parse error: {s}\n", .{@errorName(err)});
+        std.process.exit(65);
+    };
+
+    std.debug.print("Parsed expression: {s}\n", .{expression});
 }

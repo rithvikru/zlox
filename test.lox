@@ -1,8 +1,1 @@
-class Point {
-    var x, y;
-    var created;
-
-    Point(x, y) {
-        return this;
-    }
-}
+1 > 2 != 3 < 4

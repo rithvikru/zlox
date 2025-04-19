@@ -40,7 +40,17 @@ pub const Expression = union(enum) {
                 try parenthesize(writer, "group", .{g.expression});
             },
             .literal => |l| {
-                try writer.print("{d}", .{l.value});
+                switch (l) {
+                    .number => |n| {
+                        try writer.print("{d}", .{n});
+                    },
+                    .bool => |b| {
+                        try writer.print("{s}", .{if (b) "true" else "false"});
+                    },
+                    .nil => {
+                        try writer.print("nil", .{});
+                    },
+                }
             },
             .unary => |u| {
                 try parenthesize(writer, u.operator.lexeme, .{u.right});

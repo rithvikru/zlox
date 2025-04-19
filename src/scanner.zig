@@ -192,16 +192,18 @@ fn scanToken(self: *Scanner) Token {
         '>' => self.makeToken(if (self.match('=')) .GREATER_EQUAL else .GREATER),
         '"' => self.scanString(),
         else => {
-            if (isDigit(self.peek())) return self.scanNumber();
-            if (isAlpha(self.peek())) return self.scanIdentifier();
+            if (isDigit(c)) return self.scanNumber();
+            if (isAlpha(c)) return self.scanIdentifier();
             return self.makeError("Unexpected character");
         },
     };
 }
 
 pub fn scanTokens(self: *Scanner) !std.ArrayList(Token) {
-    while (!self.isAtEnd()) {
-        try self.tokens.append(self.scanToken());
+    while (true) {
+        const token = self.scanToken();
+        try self.tokens.append(token);
+        if (token.ttype == .EOF) break;
     }
     return self.tokens;
 }

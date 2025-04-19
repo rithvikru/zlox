@@ -1,148 +1,197 @@
 const std = @import("std");
 const Token = @import("scanner.zig").Token;
 const TokenType = @import("scanner.zig").TokenType;
+const Allocator = std.mem.Allocator;
+
+const ast = @import("ast.zig");
+const Expression = ast.Expression;
+const Binary = ast.Binary;
+const Unary = ast.Unary;
+const Literal = ast.Literal;
+const Grouping = ast.Grouping;
 
 const Parser = @This();
 
+const ParseError = error{
+    ExpectedExpression,
+    ExpectedRightParen,
+    OutOfMemory,
+};
+
+allocator: Allocator,
 tokens: std.ArrayList(Token),
 current: usize,
 
-pub fn init(allocator: *std.mem.Allocator, tokens: std.ArrayList(Token)) Parser {
+pub fn init(allocator: Allocator, tokens: std.ArrayList(Token)) Parser {
     return Parser{
+        .allocator = allocator,
         .tokens = tokens,
         .current = 0,
     };
 }
 
-fn expression(self: *Parser) *Expression {
-    return self.equality();
+pub fn parse(self: *Parser) ParseError!*Expression {
+    return self.expression();
 }
 
-fn equality(self: *Parser) *Expression {
-    var expr = self.comparison();
-    while (self.match(.BANG_EQUAL, .EQUAL_EQUAl)) {
+fn expression(self: *Parser) ParseError!*Expression {
+    return try self.equality();
+}
+
+fn equality(self: *Parser) ParseError!*Expression {
+    var expr = try self.comparison();
+    while (self.match(&[_]TokenType{ .BANG_EQUAL, .EQUAL_EQUAL })) {
         const operator = self.previous();
-        const right = self.comparison();
-        expr = Expression{
+        const right = try self.comparison();
+        const binary_expr = try self.allocator.create(Expression);
+        binary_expr.* = Expression{
             .binary = Binary{
                 .left = expr,
                 .operator = operator,
                 .right = right,
             },
         };
+        expr = binary_expr;
     }
     return expr;
 }
 
-fn term(self: *Parser) *Expression {
-    var expr = self.factor();
-    while (self.match(.MINUS, .PLUS)) {
+fn term(self: *Parser) ParseError!*Expression {
+    var expr = try self.factor();
+    while (self.match(&[_]TokenType{ .MINUS, .PLUS })) {
         const operator = self.previous();
-        const right = self.factor();
-        expr = Expression{
+        const right = try self.factor();
+        const binary_expr = try self.allocator.create(Expression);
+        binary_expr.* = Expression{
             .binary = Binary{
                 .left = expr,
                 .operator = operator,
                 .right = right,
             },
         };
+        expr = binary_expr;
     }
     return expr;
 }
 
-fn factor(self: *Parser) *Expression {
-    var expr = self.unary();
-    while (self.match(.SLASH, .STAR)) {
+fn factor(self: *Parser) ParseError!*Expression {
+    var expr = try self.unary();
+    while (self.match(&[_]TokenType{ .SLASH, .STAR })) {
         const operator = self.previous();
-        const right = self.unary();
-        expr = Expression{
+        const right = try self.unary();
+        const binary_expr = try self.allocator.create(Expression);
+        binary_expr.* = Expression{
             .binary = Binary{
                 .left = expr,
                 .operator = operator,
                 .right = right,
             },
         };
+        expr = binary_expr;
     }
     return expr;
 }
 
-fn unary(self: *Parser) *Expression {
-    if (self.match(.BANG, .MINUS)) {
+fn unary(self: *Parser) ParseError!*Expression {
+    if (self.match(&[_]TokenType{ .BANG, .MINUS })) {
         const operator = self.previous();
-        const right = self.unary();
-        return Expression{
+        const right = try self.unary();
+        const unary_expr = try self.allocator.create(Expression);
+        unary_expr.* = Expression{
             .unary = Unary{
                 .operator = operator,
                 .right = right,
             },
         };
+        return unary_expr;
     }
-    return self.primary();
+    return try self.primary();
 }
 
-fn comparison(self: *Parser) *Expression {
-    var expr = self.term();
-    while (self.match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL)) {
+fn comparison(self: *Parser) ParseError!*Expression {
+    var expr = try self.term();
+    while (self.match(&[_]TokenType{ .GREATER, .GREATER_EQUAL, .LESS, .LESS_EQUAL })) {
         const operator = self.previous();
-        const right = self.term();
-        expr = Expression{
+        const right = try self.term();
+        const binary_expr = try self.allocator.create(Expression);
+        binary_expr.* = Expression{
             .binary = Binary{
                 .left = expr,
                 .operator = operator,
                 .right = right,
             },
         };
+        expr = binary_expr;
     }
     return expr;
 }
 
-fn primary(self: *Parser) *Expression {
-    if (self.match(.FALSE)) {
-        return Expression{
+fn primary(self: *Parser) ParseError!*Expression {
+    if (self.match(&[_]TokenType{.FALSE})) {
+        const literal_expr = try self.allocator.create(Expression);
+        literal_expr.* = Expression{
             .literal = Literal{
                 .bool = false,
-            }
-        }
+            },
+        };
+        return literal_expr;
     }
-    if (self.match(.TRUE)) {
-        return Expression{
+    if (self.match(&[_]TokenType{.TRUE})) {
+        const literal_expr = try self.allocator.create(Expression);
+        literal_expr.* = Expression{
             .literal = Literal{
                 .bool = true,
-            }
-        }
+            } ,
+        };
+        return literal_expr;
     }
-    if (self.match(.NIL)) {
-        return Expression{
+    if (self.match(&[_]TokenType{.NIL})) {
+        const literal_expr = try self.allocator.create(Expression);
+        literal_expr.* = Expression{
             .literal = Literal{
                 .nil = {},
-            }
-        }
+            },
+        };
+        return literal_expr;
     }
 
-    if (self.match(.NUMBER)) {
-        return Expression{
+    if (self.match(&[_]TokenType{.NUMBER})) {
+        const num = std.fmt.parseFloat(f64, self.previous().lexeme) catch {
+            std.debug.print("Failed to parse float: {s}\n", .{self.previous().lexeme});
+            return ParseError.ExpectedExpression;
+        };
+        const literal_expr = try self.allocator.create(Expression);
+        literal_expr.* = Expression{
             .literal = Literal{
-                .number = std.fmt.parseFloat(f64, self.previous().lexeme),
-            }
-        }
+                .number = num,
+            },
+        };
+        return literal_expr;
     }
 
-    if (self.match(.LEFT_PAREN)) {
-        const expr = self.expression();
-        try self.consume(.RIGHT_PAREN, "Expect ')' after expression.");
-        return Expression{
+    if (self.match(&[_]TokenType{.LEFT_PAREN})) {
+        const expr = try self.expression();
+        _ = try self.consume(.RIGHT_PAREN, "Expect ')' after expression.");
+        const grouping_expr = try self.allocator.create(Expression);
+        grouping_expr.* = Expression{
             .grouping = Grouping{
                 .expression = expr,
             },
         };
+        return grouping_expr;
     }
+
+    std.debug.print("Parse error at token: {s}\n", .{self.peek().lexeme});
+    return ParseError.ExpectedExpression;
 }
 
-fn consume(self: *Parser, ttype: TokenType, message: []const u8) Token {
+fn consume(self: *Parser, ttype: TokenType, message: []const u8) ParseError!Token {
     if (self.check(ttype)) {
         return self.advance();
     }
-    return self.makeError(message);
+    std.debug.print("Consume error: {s} at token {s}\n", .{ message, self.peek().lexeme });
+    if (ttype == .RIGHT_PAREN) return ParseError.ExpectedRightParen;
+    return ParseError.ExpectedExpression;
 }
 
 fn synchronize(self: *Parser) void {
@@ -159,10 +208,10 @@ fn synchronize(self: *Parser) void {
     }
 }
 
-fn match(self: *Parser, ttypes: anytype) bool {
+fn match(self: *Parser, ttypes: []const TokenType) bool {
     for (ttypes) |ttype| {
         if (self.check(ttype)) {
-            self.advance();
+            _ = self.advance();
             return true;
         }
     }
@@ -188,9 +237,9 @@ fn isAtEnd(self: *Parser) bool {
 }
 
 fn peek(self: *Parser) Token {
-    return self.tokens[self.current];
+    return self.tokens.items[self.current];
 }
 
 fn previous(self: *Parser) Token {
-    return self.tokens[self.current - 1];
+    return self.tokens.items[self.current - 1];
 }
