@@ -129,12 +129,33 @@ fn primary(self: *Parser) *Expression {
 
     if (self.match(.LEFT_PAREN)) {
         const expr = self.expression();
-        self.consume(.RIGHT_PAREN, "Expect ')' after expression.");
+        try self.consume(.RIGHT_PAREN, "Expect ')' after expression.");
         return Expression{
             .grouping = Grouping{
                 .expression = expr,
             },
         };
+    }
+}
+
+fn consume(self: *Parser, ttype: TokenType, message: []const u8) Token {
+    if (self.check(ttype)) {
+        return self.advance();
+    }
+    return self.makeError(message);
+}
+
+fn synchronize(self: *Parser) void {
+    self.advance();
+    while (!self.isAtEnd()) {
+        if (self.previous().ttype == .SEMICOLON) {
+            return;
+        }
+        switch (self.peek().ttype) {
+            .CLASS, .FUN, .VAR, .FOR, .IF, .WHILE, .PRINT, .RETURN => return,
+            else => {},
+        }
+        self.advance();
     }
 }
 
