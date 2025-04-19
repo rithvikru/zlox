@@ -1,5 +1,7 @@
 const std = @import("std");
 const Scanner = @import("scanner.zig");
+const Ast = @import("ast.zig");
+const Token = @import("scanner.zig").Token;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
